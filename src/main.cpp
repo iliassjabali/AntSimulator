@@ -10,15 +10,15 @@ int main()
 {
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 8;
-	sf::RenderWindow window(sf::VideoMode(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT), "AntSim", sf::Style::Fullscreen, settings);
-	window.setFramerateLimit(60);
+	sf::RenderWindow window(sf::VideoMode(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT), "AntSim", sf::Style::Default, settings);
+	window.setFramerateLimit(144);
 
 	srand(11);
 
 	World world(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT);
-	Colony colony(800, 800, 512);
+	Colony colony(800, 450, 512);
 
-	world.grid_markers_home.add(Marker(colony.position, Marker::ToHome, 100000.0f, true));
+	world.addMarker(Marker(colony.position, Marker::ToHome, 100000.0f, true));
 	
 	DisplayManager display_manager(window, window, world, colony);
 

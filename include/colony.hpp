@@ -21,7 +21,7 @@ struct Colony
 
 	void update(const float dt, World& world)
 	{
-		const std::size_t ants_count = ants.size();
+		/*const std::size_t ants_count = ants.size();
 		
 		last_direction_update += dt;
 		if (last_direction_update > direction_update_period) {
@@ -34,7 +34,7 @@ struct Colony
 			});
 			group.waitExecutionDone();
 		}
-
+		*/
 		for (Ant& ant : ants) {
 			ant.update(dt, world);
 		}
@@ -46,6 +46,7 @@ struct Colony
 			a.render(target, states);
 		}
 
+		const float size = Conf<>::COLONY_SIZE;
 		sf::CircleShape circle(size);
 		circle.setOrigin(size, size);
 		circle.setPosition(position);
@@ -55,7 +56,6 @@ struct Colony
 
 	const sf::Vector2f position;
 	std::vector<Ant> ants;
-	const float size = 20.0f;
 	swrm::Swarm swarm;
 
 	float last_direction_update;

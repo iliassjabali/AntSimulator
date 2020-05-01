@@ -6,110 +6,26 @@
 
 #include "marker.hpp"
 #include "food.hpp"
+#include "grid.hpp"
+#include "flat_grid.hpp"
 
 
-template<typename T>
-struct Grid
-{
-	Grid(uint32_t width_, uint32_t height_, uint32_t cell_size_)
-		: cell_size(cell_size_)
-		, width(width_ / cell_size_)
-		, height(height_ / cell_size_)
-	{
-		cells.resize(width * height);
-	}
-
-	T* add(const T& obj)
-	{
-		return add(getCellCoords(obj.position), obj);
-	}
-
-	std::list<T>* getAt(const sf::Vector2f& position)
-	{
-		const sf::Vector2i cell_coords = getCellCoords(position);
-
-		if (checkCell(cell_coords)) {
-			return &cells[getIndexFromCoords(cell_coords)];
-		}
-
-		return nullptr;
-	}
-
-	std::list<T*> getAllAt(const sf::Vector2f& position)
-	{
-		std::list<T*> result(0);
-		const sf::Vector2i cell_coords = getCellCoords(position);
-		
-		for (int32_t x(-1); x < 2; ++x) {
-			for (int32_t y(-1); y < 2; ++y) {
-				const sf::Vector2i coords = cell_coords + sf::Vector2i(x, y);
-				if (checkCell(coords)) {
-					const uint64_t index = getIndexFromCoords(coords);
-					for (T& m : cells[index]) {
-						result.push_back(&m);
-					}
-				}
-			}
-		}
-
-		return result;
-	}
-
-	T* add(const sf::Vector2i& cell_coords, const T& obj)
-	{
-		if (checkCell(cell_coords)) {
-			std::list<T>& l = cells[getIndexFromCoords(cell_coords)];
-			l.emplace_back(obj);
-			return &l.back();
-		}
-		return nullptr;
-	}
-
-	bool checkCell(const sf::Vector2i& cell_coords)
-	{
-		return cell_coords.x > -1 && cell_coords.x < width && cell_coords.y > -1 && cell_coords.y < height;
-	}
-
-	uint64_t getIndexFromCoords(const sf::Vector2i& cell_coords)
-	{
-		return cell_coords.x + cell_coords.y * width;
-	}
-
-	sf::Vector2i getCellCoords(const sf::Vector2f& position)
-	{
-		const int32_t x_cell = position.x / cell_size;
-		const int32_t y_cell = position.y / cell_size;
-
-		return sf::Vector2i(x_cell, y_cell);
-	}
-
-	std::vector<std::list<T>> cells;
-
-	const uint32_t width, height, cell_size;
-};
+constexpr uint32_t CELL_SIZE = 4u;
 
 
 struct World
 {
 	World(uint32_t width, uint32_t height)
-		: grid_markers_home(width, height, 45)
-		, grid_markers_food(width, height, 45)
+		: grid_markers_home(width, height, CELL_SIZE)
+		, grid_markers_food(width, height, CELL_SIZE)
 		, grid_food(width, height, 5)
 		, size(width, height)
-		, va(sf::Quads)
+		, va_to_food(sf::Quads)
+		, va_to_home(sf::Quads)
 		, swarm(Conf<>::THREAD_COUNT)
-	{}
-
-	void removeExpiredMarkers()
 	{
-		// Home
-		for (std::list<Marker>& l : grid_markers_home.cells) {
-			l.remove_if([&](const Marker& m) {return m.isDone(); });
-		}
-		// Food
-		for (std::list<Marker>& l : grid_markers_food.cells) {
-			l.remove_if([&](const Marker& m) {return m.isDone(); });
-		}
+		va_to_food.resize(4 * grid_markers_home.cells.size());
+		va_to_home.resize(4 * grid_markers_home.cells.size());
 	}
 
 	void removeExpiredFood()
@@ -121,38 +37,34 @@ struct World
 
 	void update(const float dt)
 	{
-		removeExpiredMarkers();
 		removeExpiredFood();
 
 		markers_count = 0u;
-		for (std::list<Marker>& l : grid_markers_home.cells) {
-			for (Marker& m : l) {
-				++markers_count;
-				m.update(dt);
+		for (Cell& c : grid_markers_home.cells) {
+			if (!c.permanent) {
+				c.value = c.value < dt ? 0.0f : c.value - dt;
 			}
 		}
 
-		for (std::list<Marker>& l : grid_markers_food.cells) {
-			for (Marker& m : l) {
-				++markers_count;
-				m.update(dt);
+		for (Cell& c : grid_markers_food.cells) {
+			if (!c.permanent) {
+				c.value = c.value < dt ? 0.0f : c.value - dt;
 			}
 		}
 	}
 
-	Marker* addMarker(const Marker& marker)
+	void addMarker(const Marker& marker)
 	{
-		if (marker.type == Marker::ToFood) {
-			return grid_markers_food.add(marker);
-		}
-		return grid_markers_home.add(marker);
+		FlatGrid* const grid = (marker.type == Marker::ToFood) ? &grid_markers_food : &grid_markers_home;
+		grid->add(marker.position, marker.intensity, marker.permanent);
 	}
 
 	void render(sf::RenderTarget& target, const sf::RenderStates& states) const
 	{
-		va.resize(4 * markers_count);
-		generateMarkersVertexArray(va);
-		target.draw(va, states);
+		generateMarkersVertexArray(va_to_food, grid_markers_food, Conf<>::TO_FOOD_COLOR);
+		generateMarkersVertexArray(va_to_home, grid_markers_home, Conf<>::TO_HOME_COLOR);
+		target.draw(va_to_food, states);
+		target.draw(va_to_home, states);
 
 		for (const std::list<Food>& l : grid_food.cells) {
 			for (const Food& f : l) {
@@ -161,36 +73,40 @@ struct World
 		}
 	}
 
-	void generateMarkersVertexArray(sf::VertexArray& va) const
+	void generateMarkersVertexArray(sf::VertexArray& va, const FlatGrid& grid, const sf::Color& base_color) const
 	{
-		uint32_t current_index = 0;
-		for (const std::list<Marker>& l : grid_markers_home.cells) {
-			for (const Marker& m : l) {
-				m.render_in(va, 4 * current_index);
-				++current_index;
-			}
-		}
+		uint64_t index = 0u;
+		const float cell_size = grid.cell_size;
+		for (uint32_t x(0); x < grid.width; ++x) {
+			for (uint32_t y(0); y < grid.height; ++y) {
+				va[4 * index + 0].position = sf::Vector2f(x * cell_size, y * cell_size);
+				va[4 * index + 1].position = sf::Vector2f((x + 1) * cell_size, y * cell_size);
+				va[4 * index + 2].position = sf::Vector2f((x + 1) * cell_size, (y + 1) * cell_size);
+				va[4 * index + 3].position = sf::Vector2f(x * cell_size, (y + 1) * cell_size);
 
-		for (const std::list<Marker>& l : grid_markers_food.cells) {
-			for (const Marker& m : l) {
-				m.render_in(va, 4 * current_index);
-				++current_index;
+				const float ratio = std::min(1.0f, grid.getAt(cell_size * sf::Vector2f(x, y)).value / Conf<>::MAX_CELL_INTENSITY);
+				const sf::Color color(base_color.r, base_color.g, base_color.b, 255 * ratio);
+
+				va[4 * index + 0].color = color;
+				va[4 * index + 1].color = color;
+				va[4 * index + 2].color = color;
+				va[4 * index + 3].color = color;
+				++index;
 			}
 		}
 	}
 
 	void addFoodAt(float x, float y, float quantity)
 	{
-		Marker* marker = addMarker(Marker(sf::Vector2f(x, y), Marker::ToFood, 100000000.0f, true));
-		if (marker) {
-			grid_food.add(Food(x, y, 4.0f, quantity, marker));
-		}
+		addMarker(Marker(sf::Vector2f(x, y), Marker::ToFood, 1000.0f, true));
+		grid_food.add(Food(x, y, 4.0f, quantity));
 	}
 
 	sf::Vector2f size;
-	mutable sf::VertexArray va;
-	Grid<Marker> grid_markers_home;
-	Grid<Marker> grid_markers_food;
+	mutable sf::VertexArray va_to_food;
+	mutable sf::VertexArray va_to_home;
+	FlatGrid grid_markers_home;
+	FlatGrid grid_markers_food;
 	Grid<Food> grid_food;
 	swrm::Swarm swarm;
 

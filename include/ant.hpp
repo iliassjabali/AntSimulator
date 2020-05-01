@@ -9,7 +9,7 @@
 #include <iostream>
 
 
-constexpr float max_reserve = 2000.0f;
+constexpr float max_reserve = 1000.0f;
 
 
 struct Ant
@@ -38,6 +38,7 @@ struct Ant
 
 		last_direction_update += dt;
 		if (last_direction_update > direction_update_period) {
+			findMarker(world);
 			float range = PI * 0.08f;
 			direction += getRandRange(range);
 			last_direction_update = 0.0f;
@@ -69,7 +70,7 @@ struct Ant
 				phase = Marker::ToHome;
 				direction += PI;
 				reserve = max_reserve;
-				fp->pick();
+				fp->pick(world.grid_markers_food);
 				return;
 			}
 		}
@@ -77,7 +78,7 @@ struct Ant
 
 	void checkColony()
 	{
-		const float colony_size = 20.0f;
+		const float colony_size = Conf<>::COLONY_SIZE;
 		if (getLength(position - colony) < colony_size) {
 			if (phase == Marker::ToHome) {
 				phase = Marker::ToFood;
@@ -94,37 +95,51 @@ struct Ant
 
 	void findMarker(World& world)
 	{
-		std::list<Marker*> markers;
-		if (phase == Marker::ToFood) {
-			markers = world.grid_markers_food.getAllAt(position);
-		}
-		else {
-			markers = world.grid_markers_home.getAllAt(position);
-		}
-
-		const float max_dist = 40.0f;
+		const int32_t max_dist = 5u;
 
 		float total_intensity = 0.0f;
 		sf::Vector2f point(0.0f, 0.0f);
 
-		for (Marker* mp : markers) {
-			Marker& m = *mp;
-			const sf::Vector2f to_marker = m.position - position;
-			const float length = getLength(to_marker);
+		const sf::Vector2f dir_vec = sf::Vector2f(cos(direction), sin(direction));
+		const float dir_x = sign(dir_vec.x);
+		const float dir_y = sign(dir_vec.y);
 
-			if (length < max_dist) {
-				if (m.type == phase) {
-					if (dot(to_marker, sf::Vector2f(cos(direction), sin(direction))) > 0.0f) {
-						total_intensity += m.intensity;
-						point += m.intensity * m.position;
+		const FlatGrid* const grid = (phase == Marker::ToFood) ? &world.grid_markers_food : &world.grid_markers_home;
+
+		const sf::Vector2i grid_pos = grid->getCellCoords(position);
+		for (int32_t x(-max_dist); x < max_dist+1; ++x) {
+			for (int32_t y(-max_dist); y < max_dist+1; ++y) {
+				if (x && y) {
+					const sf::Vector2i offset(dir_x * x, dir_y * y);
+					const sf::Vector2f cell_world_pos = getWorldCoords(grid_pos + offset, *grid);
+					const sf::Vector2f to_marker = cell_world_pos - position;
+					if (dot(to_marker, dir_vec) > 0.0f && getLength(to_marker) < max_dist * grid->cell_size) {
+						const Cell c = grid->getAt(position, offset);
+						if (c.permanent) {
+							setDirection(cell_world_pos);
+							return;
+						}
+						const float intensity = c.value;
+						total_intensity += intensity;
+						point += intensity * cell_world_pos;
 					}
 				}
 			}
 		}
 
 		if (total_intensity) {
-			direction = getAngle(point / total_intensity - position);
+			setDirection(point / total_intensity);
 		}
+	}
+
+	void setDirection(const sf::Vector2f& target)
+	{
+		direction = getAngle(target - position);
+	}
+
+	const sf::Vector2f getWorldCoords(const sf::Vector2i& cell_coords, const FlatGrid& grid) const
+	{
+		return float(grid.cell_size) * sf::Vector2f(cell_coords.x + 0.5f, cell_coords.y + 0.5f);
 	}
 
 	void addMarker(World& world)
