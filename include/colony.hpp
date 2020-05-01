@@ -12,7 +12,7 @@ struct Colony
 	Colony(float x, float y, uint32_t n)
 		: position(x, y)
 		, last_direction_update(0.0f)
-		, swarm(Conf<>::THREAD_COUNT)
+		, va(sf::Triangles, 3 * n)
 	{
 		for (uint32_t i(n); i--;) {
 			ants.emplace_back(x, y, getRandRange(2.0f * PI), n - i - 1);
@@ -42,8 +42,14 @@ struct Colony
 
 	void render(sf::RenderTarget& target, const sf::RenderStates& states) const
 	{
+		//for (const Ant& a : ants) {
+		//	a.render(target, states);
+		//}
+
+		uint64_t index = 0;
 		for (const Ant& a : ants) {
-			a.render(target, states);
+			a.render_in(va, 3 * index);
+			++index;
 		}
 
 		const float size = Conf<>::COLONY_SIZE;
@@ -52,13 +58,15 @@ struct Colony
 		circle.setPosition(position);
 		circle.setFillColor(Conf<>::COLONY_COLOR);
 		target.draw(circle, states);
+
+		target.draw(va, states);
 	}
 
 	const sf::Vector2f position;
 	std::vector<Ant> ants;
-	swrm::Swarm swarm;
 
 	float last_direction_update;
 	const float direction_update_period = 0.25f;
+	mutable sf::VertexArray va;
 
 };

@@ -16,7 +16,7 @@ struct Conf
 	inline const static uint32_t WIN_WIDTH = 1600;
 	inline const static uint32_t WIN_HEIGHT = 900;
 
-	inline const static float MAX_CELL_INTENSITY = 60.0f;
+	inline const static float MAX_CELL_INTENSITY = 100.0f;
 	inline const static float COLONY_SIZE = 20.0f;
 };
 

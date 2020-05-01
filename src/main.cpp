@@ -11,12 +11,12 @@ int main()
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 8;
 	sf::RenderWindow window(sf::VideoMode(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT), "AntSim", sf::Style::Default, settings);
-	//window.setFramerateLimit(144);
+	window.setFramerateLimit(144);
 
 	srand(11);
 
 	World world(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT);
-	Colony colony(800, 450, 1024);
+	Colony colony(800, 450, 32);
 
 	world.addMarker(Marker(colony.position, Marker::ToHome, 100000.0f, true));
 	
@@ -43,7 +43,7 @@ int main()
 		colony.update(dt, world);
 		world.update(dt);
 
-		window.clear(sf::Color::Black);
+		window.clear(sf::Color(94, 87, 87));
 		
 		display_manager.draw();
 

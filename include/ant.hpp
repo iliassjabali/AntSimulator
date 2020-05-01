@@ -174,6 +174,28 @@ struct Ant
 		target.draw(body, states);
 	}
 
+	void render_in(sf::VertexArray& va, const uint64_t index) const
+	{
+		const float width = 2.0f;
+		const float length = 10.0f;
+
+		const sf::Vector2f dir_vec(cos(direction), sin(direction));
+
+		va[index + 0].position = position + width * sf::Vector2f(-dir_vec.y, dir_vec.x);
+		va[index + 1].position = position - width * sf::Vector2f(-dir_vec.y, dir_vec.x);
+		va[index + 2].position = position + length * dir_vec;
+		
+		va[index + 0].color = Conf<>::ANT_COLOR;
+		va[index + 1].color = Conf<>::ANT_COLOR;
+
+		if (phase == Marker::ToHome) {			
+			va[index + 2].color = Conf<>::FOOD_COLOR;
+		}
+		else {
+			va[index + 2].color = Conf<>::ANT_COLOR;
+		}
+	}
+
 	sf::Vector2f colony;
 	sf::Vector2f position;
 	float direction;
