@@ -95,7 +95,7 @@ struct Ant
 
 	void findMarker(World& world)
 	{
-		const int32_t max_dist = 5u;
+		const int32_t max_dist = 10u;
 
 		float total_intensity = 0.0f;
 		sf::Vector2f point(0.0f, 0.0f);

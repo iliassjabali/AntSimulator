@@ -20,12 +20,21 @@ struct World
 		, grid_markers_food(width, height, CELL_SIZE)
 		, grid_food(width, height, 5)
 		, size(width, height)
-		, va_to_food(sf::Quads)
-		, va_to_home(sf::Quads)
+		, va(sf::Quads)
 		, swarm(Conf<>::THREAD_COUNT)
 	{
-		va_to_food.resize(4 * grid_markers_home.cells.size());
-		va_to_home.resize(4 * grid_markers_home.cells.size());
+		va.resize(4 * grid_markers_home.cells.size());
+
+		uint64_t index = 0u;
+		for (uint32_t x(0); x < grid_markers_food.width; ++x) {
+			for (uint32_t y(0); y < grid_markers_food.height; ++y) {
+				va[4 * index + 0].position = sf::Vector2f(x * CELL_SIZE, y * CELL_SIZE);
+				va[4 * index + 1].position = sf::Vector2f((x + 1) * CELL_SIZE, y * CELL_SIZE);
+				va[4 * index + 2].position = sf::Vector2f((x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE);
+				va[4 * index + 3].position = sf::Vector2f(x * CELL_SIZE, (y + 1) * CELL_SIZE);
+				++index;
+			}
+		}
 	}
 
 	void removeExpiredFood()
@@ -61,10 +70,8 @@ struct World
 
 	void render(sf::RenderTarget& target, const sf::RenderStates& states) const
 	{
-		generateMarkersVertexArray(va_to_food, grid_markers_food, Conf<>::TO_FOOD_COLOR);
-		generateMarkersVertexArray(va_to_home, grid_markers_home, Conf<>::TO_HOME_COLOR);
-		target.draw(va_to_food, states);
-		target.draw(va_to_home, states);
+		generateMarkersVertexArray();
+		target.draw(va, states);
 
 		for (const std::list<Food>& l : grid_food.cells) {
 			for (const Food& f : l) {
@@ -73,19 +80,20 @@ struct World
 		}
 	}
 
-	void generateMarkersVertexArray(sf::VertexArray& va, const FlatGrid& grid, const sf::Color& base_color) const
+	void generateMarkersVertexArray() const
 	{
 		uint64_t index = 0u;
-		const float cell_size = grid.cell_size;
-		for (uint32_t x(0); x < grid.width; ++x) {
-			for (uint32_t y(0); y < grid.height; ++y) {
-				va[4 * index + 0].position = sf::Vector2f(x * cell_size, y * cell_size);
-				va[4 * index + 1].position = sf::Vector2f((x + 1) * cell_size, y * cell_size);
-				va[4 * index + 2].position = sf::Vector2f((x + 1) * cell_size, (y + 1) * cell_size);
-				va[4 * index + 3].position = sf::Vector2f(x * cell_size, (y + 1) * cell_size);
+		const float cell_size = grid_markers_food.cell_size;
+		for (uint32_t x(0); x < grid_markers_food.width; ++x) {
+			for (uint32_t y(0); y < grid_markers_food.height; ++y) {
+				const float ratio_food = std::min(1.0f, grid_markers_food.getAt(cell_size * sf::Vector2f(x, y)).value / Conf<>::MAX_CELL_INTENSITY);
+				const float ratio_home = std::min(1.0f, grid_markers_home.getAt(cell_size * sf::Vector2f(x, y)).value / Conf<>::MAX_CELL_INTENSITY);
 
-				const float ratio = std::min(1.0f, grid.getAt(cell_size * sf::Vector2f(x, y)).value / Conf<>::MAX_CELL_INTENSITY);
-				const sf::Color color(base_color.r, base_color.g, base_color.b, 255 * ratio);
+				const float r = std::min(255.0f, Conf<>::TO_FOOD_COLOR.r * ratio_food + Conf<>::TO_HOME_COLOR.r * ratio_home);
+				const float g = std::min(255.0f, Conf<>::TO_FOOD_COLOR.g * ratio_food + Conf<>::TO_HOME_COLOR.g * ratio_home);
+				const float b = std::min(255.0f, Conf<>::TO_FOOD_COLOR.b * ratio_food + Conf<>::TO_HOME_COLOR.b * ratio_home);
+
+				const sf::Color color(r, g, b);
 
 				va[4 * index + 0].color = color;
 				va[4 * index + 1].color = color;
@@ -103,8 +111,7 @@ struct World
 	}
 
 	sf::Vector2f size;
-	mutable sf::VertexArray va_to_food;
-	mutable sf::VertexArray va_to_home;
+	mutable sf::VertexArray va;
 	FlatGrid grid_markers_home;
 	FlatGrid grid_markers_food;
 	Grid<Food> grid_food;
