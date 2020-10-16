@@ -16,8 +16,8 @@ int main()
 	Conf<>::loadTextures();
 
 	World world(Conf<>::WIN_WIDTH, Conf<>::WIN_HEIGHT);
-	Colony colony(800, 450, 512);
-	world.addMarker(Marker(colony.position, Marker::ToHome, 10.0f, true));
+	Colony colony(800, 450, 1024);
+	world.markers_map.addPermanentHome(colony.position);
 	
 	DisplayManager display_manager(window, window, world, colony);
 

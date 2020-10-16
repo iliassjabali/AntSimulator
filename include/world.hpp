@@ -6,6 +6,7 @@
 #include "marker.hpp"
 #include "food.hpp"
 #include "utils.hpp"
+#include "pheromap.hpp"
 
 
 template<typename T>
@@ -93,67 +94,43 @@ struct Grid
 
 struct World
 {
+	sf::Vector2f size;
+	mutable sf::VertexArray va;
+	Pheromap markers_map;
+	Grid<Food> grid_food;
+
+	uint64_t markers_count;
+
 	World(uint32_t width, uint32_t height)
-		: grid_markers_home(width, height, 45)
-		, grid_markers_food(width, height, 45)
+		: markers_map(width, height, 2)
 		, grid_food(width, height, 5)
 		, size(to<float>(width), to<float>(height))
 		, va(sf::Quads)
 	{}
 
-	void removeExpiredMarkers()
-	{
-		// Home
-		for (std::list<Marker>& l : grid_markers_home.cells) {
-			l.remove_if([&](const Marker& m) {return m.isDone(); });
-		}
-		// Food
-		for (std::list<Marker>& l : grid_markers_food.cells) {
-			l.remove_if([&](const Marker& m) {return m.isDone(); });
-		}
-	}
-
 	void removeExpiredFood()
 	{
 		for (std::list<Food>& l : grid_food.cells) {
-			l.remove_if([&](const Food& m) {return m.isDone(); });
+			l.remove_if([&](const Food& m) {
+				if (m.isDone()) {
+					markers_map.removePermanentFood(m.position);
+					return true;
+				}
+				return false;
+			});
 		}
 	}
 
-	void update(const float dt)
+	void update(float dt)
 	{
-		removeExpiredMarkers();
 		removeExpiredFood();
-
-		markers_count = 0u;
-		for (std::list<Marker>& l : grid_markers_home.cells) {
-			for (Marker& m : l) {
-				markers_count += m.permanent ? 0 : 1;
-				m.update(dt);
-			}
-		}
-
-		for (std::list<Marker>& l : grid_markers_food.cells) {
-			for (Marker& m : l) {
-				markers_count += m.permanent ? 0 : 1;
-				m.update(dt);
-			}
-		}
-	}
-
-	Marker* addMarker(const Marker& marker)
-	{
-		return getGrid(marker.type).add(marker);
+		markers_map.update(dt);
 	}
 
 	void render(sf::RenderTarget& target, const sf::RenderStates& states, bool draw_markers = true) const
 	{
 		if (draw_markers) {
-			va.resize(4 * markers_count);
-			generateMarkersVertexArray(va);
-			sf::RenderStates rs = states;
-			rs.texture = &(*Conf<>::MARKER_TEXTURE);
-			target.draw(va, rs);
+			target.draw(markers_map.getSprite(), states);
 		}
 
 		for (const std::list<Food>& l : grid_food.cells) {
@@ -163,47 +140,9 @@ struct World
 		}
 	}
 
-	void generateMarkersVertexArray(sf::VertexArray& va) const
-	{
-		uint32_t current_index = 0;
-		for (const std::list<Marker>& l : grid_markers_home.cells) {
-			for (const Marker& m : l) {
-				if (!m.permanent) {
-					m.render_in(va, 4 * (current_index++));
-				}
-			}
-		}
-
-		for (const std::list<Marker>& l : grid_markers_food.cells) {
-			for (const Marker& m : l) {
-				if (!m.permanent) {
-					m.render_in(va, 4 * (current_index++));
-				}
-			}
-		}
-	}
-
 	void addFoodAt(float x, float y, float quantity)
 	{
-		Marker* marker = addMarker(Marker(sf::Vector2f(x, y), Marker::ToFood, 100000000.0f, true));
-		if (marker) {
-			grid_food.add(Food(x, y, 4.0f, quantity, marker));
-		}
+		grid_food.add(Food(x, y, 4.0f, quantity));
+		markers_map.addPermanentFood(sf::Vector2f(x, y));
 	}
-
-	Grid<Marker>& getGrid(Marker::Type type)
-	{
-		if (type == Marker::ToFood) {
-			return grid_markers_food;
-		}
-		return grid_markers_home;
-	}
-
-	sf::Vector2f size;
-	mutable sf::VertexArray va;
-	Grid<Marker> grid_markers_home;
-	Grid<Marker> grid_markers_food;
-	Grid<Food> grid_food;
-
-	uint64_t markers_count;
 };

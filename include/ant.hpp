@@ -90,7 +90,7 @@ struct Ant
 		, reserve(0.0f)
 		, id(id_)
 	{
-		reserve = max_reserve;
+		reserve = 2000;
 	}
 
 	void update(const float dt, World& world)
@@ -154,7 +154,7 @@ struct Ant
 
 	void findMarker(World& world)
 	{
-		std::list<Marker*> markers = world.getGrid(phase).getAllAt(position);
+		/*std::list<Marker*> markers = world.getGrid(phase).getAllAt(position);
 
 		float total_intensity = 0.0f;
 		sf::Vector2f point(0.0f, 0.0f);
@@ -176,13 +176,34 @@ struct Ant
 
 		if (total_intensity) {
 			direction = getAngle(point / total_intensity - position);
+		}*/
+
+		PheroDirection phero_direction;
+		
+		const float radius = 30.0f;
+		if (phase == Marker::ToFood) {
+			phero_direction = world.markers_map.getFoodDirection(position, direction.getVec(), radius);
+		}
+		else {
+			phero_direction = world.markers_map.getHomeDirection(position, direction.getVec(), radius);
+		}
+
+		if (phero_direction.intensity) {
+			direction = getAngle(phero_direction.direction);
 		}
 	}
 
 	void addMarker(World& world)
 	{
 		if (reserve > 1.0f) {
-			world.addMarker(Marker(position, phase == Marker::ToFood ? Marker::ToHome : Marker::ToFood, reserve * 0.02f));
+			//world.addMarker(Marker(position, phase == Marker::ToFood ? Marker::ToHome : Marker::ToFood, reserve * 0.02f));
+
+			if (phase == Marker::ToFood) {
+				world.markers_map.addToHome(position, reserve * 0.02f);
+			}
+			else {
+				world.markers_map.addToFood(position, reserve * 0.02f);
+			}
 			reserve *= 0.98f;
 		}
 
@@ -226,9 +247,9 @@ struct Ant
 	const float width = 2.0f;
 	const float length = 3.5f;
 	const float move_speed = 50.0f;
-	const float marker_detection_max_dist = 40.0f;
+	//const float marker_detection_max_dist = 40.0f;
 	const float direction_update_period = 0.125f;
-	const float marker_period = 0.25f;
+	const float marker_period = 0.125f;
 	const float max_reserve = 2000.0f;
 	const float direction_noise_range = PI * 0.1f;
 };
