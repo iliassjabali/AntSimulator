@@ -19,7 +19,7 @@ struct Pheromap
 	sf::Vector2i size;
 	uint32_t scale;
 	sf::Image image;
-	const float time_to_decrease_one = 0.50f;
+	const float time_to_decrease_one = 1.0f;
 	float current_time;
 	const int32_t max_value = 254;
 	const float permanent_priority = 10000.0f;
@@ -151,7 +151,7 @@ struct Pheromap
 		const sf::Vector2i image_coords = getImageCoord(position);
 		if (checkCoords(image_coords)) {
 			const sf::Color values = image.getPixel(image_coords.x, image_coords.y);
-			image.setPixel(image_coords.x, image_coords.y, sf::Color(max_value, values.g, values.b));
+			image.setPixel(image_coords.x, image_coords.y, sf::Color(0, values.g, values.b));
 		}
 	}
 

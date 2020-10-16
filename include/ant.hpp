@@ -208,16 +208,19 @@ struct Ant
 
 	void addMarker(World& world)
 	{
-		if (reserve > 1.0f) {
+		const float marker_ratio = 0.01f;
+		const float marker_amount = 10.0f;
+		const float amount = marker_ratio * reserve + marker_amount;
+		if (reserve > amount) {
 			//world.addMarker(Marker(position, phase == Marker::ToFood ? Marker::ToHome : Marker::ToFood, reserve * 0.02f));
-
+			
 			if (phase == Marker::ToFood) {
-				world.markers_map.addToHome(position, reserve * 0.02f);
+				world.markers_map.addToHome(position, amount);
 			}
 			else {
-				world.markers_map.addToFood(position, reserve * 0.02f);
+				world.markers_map.addToFood(position, amount);
 			}
-			reserve *= 0.98f;
+			reserve -= amount;
 		}
 
 		last_marker = 0.0f;
@@ -263,6 +266,6 @@ struct Ant
 	//const float marker_detection_max_dist = 40.0f;
 	const float direction_update_period = 0.125f;
 	const float marker_period = 0.125f;
-	const float max_reserve = 2000.0f;
+	const float max_reserve = 10000.0f;
 	const float direction_noise_range = PI * 0.1f;
 };

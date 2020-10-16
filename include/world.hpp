@@ -118,7 +118,15 @@ struct World
 		, grid_food(width, height, 5)
 		, size(to<float>(width), to<float>(height))
 		, va(sf::Quads)
-	{}
+	{
+		for (int32_t x(0); x < grid_walls.width; x++) {
+			for (int32_t y(0); y < grid_walls.height; y++) {
+				if (x == 0 || x == grid_walls.width - 1 || y == 0 || y == grid_walls.height - 1) {
+					grid_walls.cells[grid_walls.getIndexFromCoords(sf::Vector2i(x, y))].emplace_back();
+				}
+			}
+		}
+	}
 
 	void removeExpiredFood()
 	{
@@ -128,6 +136,7 @@ struct World
 					markers_map.removePermanentFood(m.position);
 					return true;
 				}
+				markers_map.addPermanentFood(m.position);
 				return false;
 			});
 		}
