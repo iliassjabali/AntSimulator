@@ -7,6 +7,7 @@
 #include "food.hpp"
 #include "utils.hpp"
 #include "pheromap.hpp"
+#include "wall.hpp"
 
 
 template<typename T>
@@ -23,6 +24,17 @@ struct Grid
 	T* add(const T& obj)
 	{
 		return add(getCellCoords(obj.position), obj);
+	}
+
+	bool isEmpty(const sf::Vector2f& position) const
+	{
+		const sf::Vector2i cell_coords = getCellCoords(position);
+
+		if (checkCell(cell_coords)) {
+			return cells[getIndexFromCoords(cell_coords)].empty();
+		}
+
+		return true;
 	}
 
 	std::list<T>* getAt(const sf::Vector2f& position)
@@ -68,17 +80,17 @@ struct Grid
 		return nullptr;
 	}
 
-	bool checkCell(const sf::Vector2i& cell_coords)
+	bool checkCell(const sf::Vector2i& cell_coords) const
 	{
 		return cell_coords.x > -1 && cell_coords.x < width && cell_coords.y > -1 && cell_coords.y < height;
 	}
 
-	uint64_t getIndexFromCoords(const sf::Vector2i& cell_coords)
+	uint64_t getIndexFromCoords(const sf::Vector2i& cell_coords) const
 	{
 		return cell_coords.x + cell_coords.y * width;
 	}
 
-	sf::Vector2i getCellCoords(const sf::Vector2f& position)
+	sf::Vector2i getCellCoords(const sf::Vector2f& position) const
 	{
 		const int32_t x_cell = to<int32_t>(position.x / cell_size);
 		const int32_t y_cell = to<int32_t>(position.y / cell_size);
@@ -97,12 +109,12 @@ struct World
 	sf::Vector2f size;
 	mutable sf::VertexArray va;
 	Pheromap markers_map;
+	Grid<Wall> grid_walls;
 	Grid<Food> grid_food;
-
-	uint64_t markers_count;
 
 	World(uint32_t width, uint32_t height)
 		: markers_map(width, height, 2)
+		, grid_walls(width, height, 20)
 		, grid_food(width, height, 5)
 		, size(to<float>(width), to<float>(height))
 		, va(sf::Quads)
@@ -127,11 +139,43 @@ struct World
 		markers_map.update(dt);
 	}
 
+	void addWall(const sf::Vector2f& position)
+	{
+		grid_walls.add(Wall{ position });
+	}
+
 	void render(sf::RenderTarget& target, const sf::RenderStates& states, bool draw_markers = true) const
 	{
 		if (draw_markers) {
 			target.draw(markers_map.getSprite(), states);
 		}
+
+		uint64_t i = 0;
+		sf::VertexArray va(sf::Quads, 4 * grid_walls.cells.size());
+		const float cell_size = grid_walls.cell_size;
+		for (int32_t x(0); x < grid_walls.width; x++) {
+			for (int32_t y(0); y < grid_walls.height; y++) {
+				const uint32_t index = y * grid_walls.width + x;
+				sf::Color color(sf::Color(0, 0, 0, 0));
+				if (!grid_walls.cells[index].empty()) {
+					color = sf::Color(94, 87, 87);
+				}
+				sf::Vector2f position(x * cell_size, y * cell_size);
+
+				va[4 * i].position = position;
+				va[4 * i + 1].position = position + sf::Vector2f(cell_size, 0.0f);
+				va[4 * i + 2].position = position + sf::Vector2f(cell_size, cell_size);
+				va[4 * i + 3].position = position + sf::Vector2f(0.0f, cell_size);
+
+				va[4 * i].color = color;
+				va[4 * i + 1].color = color;
+				va[4 * i + 2].color = color;
+				va[4 * i + 3].color = color;
+				++i;
+			}
+		}
+
+		target.draw(va, states);
 
 		for (const std::list<Food>& l : grid_food.cells) {
 			for (const Food& f : l) {
